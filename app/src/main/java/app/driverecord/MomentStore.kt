@@ -18,7 +18,8 @@ class MomentStore(context: Context) {
                     timeText = o.optString("timeText"),
                     driveMode = o.optString("driveMode"),
                     placeName = o.optString("placeName"),
-                    memo = o.optString("memo", "")
+                    memo = o.optString("memo", ""),
+                    photoPath = o.optString("photoPath", "")
                 )
             }
         } catch (e: Exception) {
@@ -36,6 +37,7 @@ class MomentStore(context: Context) {
                     .put("driveMode", m.driveMode)
                     .put("placeName", m.placeName)
                     .put("memo", m.memo)
+                    .put("photoPath", m.photoPath)
             )
         }
         prefs.edit().putString("moments", arr.toString()).apply()
