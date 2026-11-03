@@ -45,12 +45,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             DriveRecordTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    CaptureScreen(
-                        vehicle = vehicle,
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                AppRoot(vehicle)
             }
         }
     }
