@@ -39,7 +39,7 @@ fun AppRoot(vehicle: VehicleDataSource) {
         }
     ) { inner ->
         Box(if (tab == 0) Modifier.fillMaxSize().padding(inner) else Modifier.size(0.dp)) {
-            CaptureScreen(vehicle, Modifier)
+            CaptureTab(vehicle, Modifier)
         }
         Box(if (tab == 1) Modifier.fillMaxSize().padding(inner) else Modifier.size(0.dp)) {
             FixScreen(Modifier)

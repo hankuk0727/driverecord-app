@@ -4,7 +4,8 @@ data class DriveMoment(
     val id: Int,
     val timeText: String,
     val driveMode: String,
-    val placeName: String
+    val placeName: String,
+    val memo: String = ""
 )
 
 interface VehicleDataSource {
