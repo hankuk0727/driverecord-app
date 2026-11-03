@@ -29,6 +29,27 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
     }
     DisposableEffect(Unit) { onDispose { tone?.release() } }
 
+    // 화면 버튼과 핸들 버튼이 함께 쓰는 캡처 동작. 정차 중이면 무시(false).
+    fun capture(): Boolean {
+        if (isParked) return false
+        val m = DriveMoment(
+            id = nextId,
+            timeText = SimpleDateFormat("HH:mm:ss", Locale.KOREA).format(Date()),
+            driveMode = vehicle.currentDriveMode(),
+            placeName = vehicle.currentPlaceName()
+        )
+        moments.add(m)
+        store.save(moments)
+        nextId += 1
+        tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+        return true
+    }
+
+    DisposableEffect(Unit) {
+        WheelKeys.onCapture = { capture() }
+        onDispose { WheelKeys.onCapture = null }
+    }
+
     Column(
         modifier = modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -41,20 +62,14 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
 
         if (!isParked) {
             Button(
-                onClick = {
-                    val m = DriveMoment(
-                        id = nextId,
-                        timeText = SimpleDateFormat("HH:mm:ss", Locale.KOREA).format(Date()),
-                        driveMode = vehicle.currentDriveMode(),
-                        placeName = vehicle.currentPlaceName()
-                    )
-                    moments.add(m)
-                    store.save(moments)
-                    nextId += 1
-                    tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
-                },
+                onClick = { capture() },
                 modifier = Modifier.fillMaxWidth().height(160.dp)
             ) { Text("캡처", fontSize = 40.sp) }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "핸들 버튼(시험용: 키보드 C 키)으로도 캡처돼요.",
+                style = MaterialTheme.typography.bodySmall
+            )
         } else {
             Text("오늘의 장면 ${moments.size}개", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
