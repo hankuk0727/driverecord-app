@@ -67,7 +67,8 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                 id = id,
                 timeText = SimpleDateFormat("HH:mm:ss", Locale.KOREA).format(Date()),
                 driveMode = vehicle.currentDriveMode(),
-                placeName = vehicle.currentPlaceName()
+                placeName = vehicle.currentPlaceName(),
+                speedKmh = vehicle.currentSpeedKmh()
             )
         )
         store.save(moments)
@@ -149,6 +150,13 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                                 moments[idx] = moments[idx].copy(memo = text)
                                 store.save(moments)
                             }
+                        },
+                        onStickerChange = { on ->
+                            val idx = moments.indexOfFirst { it.id == m.id }
+                            if (idx >= 0) {
+                                moments[idx] = moments[idx].copy(sticker = on)
+                                store.save(moments)
+                            }
                         }
                     )
                 }
@@ -171,24 +179,36 @@ private fun MomentItem(
     number: Int,
     moment: DriveMoment,
     onDelete: () -> Unit,
-    onMemoChange: (String) -> Unit
+    onMemoChange: (String) -> Unit,
+    onStickerChange: (Boolean) -> Unit
 ) {
-    val thumb = remember(moment.photoPath) {
+    // 사진은 한 번만 읽고, 스티커는 켜져 있을 때만 그 위에 입혀서 보여줌
+    val base = remember(moment.photoPath) {
         if (moment.photoPath.isEmpty()) null
         else {
             val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
-            BitmapFactory.decodeFile(moment.photoPath, opts)?.asImageBitmap()
+            BitmapFactory.decodeFile(moment.photoPath, opts)
         }
+    }
+    val shown = remember(base, moment.sticker, moment.memo, moment.speedKmh, moment.timeText) {
+        if (base == null) null
+        else if (moment.sticker) StickerRender.apply(base, moment).asImageBitmap()
+        else base.asImageBitmap()
     }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("장면 $number", style = MaterialTheme.typography.titleMedium)
-            thumb?.let {
+            shown?.let {
                 Image(it, null, Modifier.fillMaxWidth(), contentScale = ContentScale.FillWidth)
             }
             Text("시각: ${moment.timeText}")
-            Text("주행 모드: ${moment.driveMode}")
+            Text("주행 모드: ${moment.driveMode} · 속도: ${moment.speedKmh}km/h")
             Text("장소: ${moment.placeName}")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Switch(checked = moment.sticker, onCheckedChange = onStickerChange)
+                Spacer(Modifier.width(8.dp))
+                Text("차량 정보 스티커")
+            }
             OutlinedTextField(
                 value = moment.memo,
                 onValueChange = onMemoChange,
