@@ -15,19 +15,26 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import app.driverecord.ui.theme.DrAmber
+import app.driverecord.ui.theme.DrError
+import app.driverecord.ui.theme.DrOutline
+import app.driverecord.ui.theme.DrTextPrimary
+import app.driverecord.ui.theme.DrTextSecondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -52,6 +59,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
     var zoomed by remember { mutableStateOf<DriveMoment?>(null) }
     var recallText by remember { mutableStateOf<String?>(null) }   // 같은 장소 회상 안내
     var demoMode by remember { mutableStateOf(vehicle.isDemoMode()) }
+    var demoOpen by remember { mutableStateOf(false) }             // 시연 설정 펼침 (기본 접힘)
     var askReset by remember { mutableStateOf(false) }             // 시연 초기화 확인 창
 
     val multiPicker = rememberLauncherForActivityResult(
@@ -130,112 +138,234 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
         onDispose { WheelKeys.onCapture = null }
     }
 
-    Column(
-        modifier = modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            if (isParked) "정차 중" else "주행 중",
-            style = MaterialTheme.typography.headlineSmall
-        )
-        Spacer(Modifier.height(12.dp))
+    // ---- 가로/세로 화면에서 함께 쓰는 조각들 ----
 
-        if (!isParked) {
-            // 내용이 길어져도 아래 "정차로 바꾸기" 버튼이 가려지지 않게 이 부분만 스크롤
-            Column(
-                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally
+    // 같은 장소 회상 카드
+    val recallCard: @Composable () -> Unit = {
+        recallText?.let { text ->
+            DrCard {
+                Text("이곳에서 남긴 장면", style = MaterialTheme.typography.titleSmall)
+                Text(text, style = MaterialTheme.typography.bodyMedium, color = DrTextSecondary)
+            }
+        }
+    }
+
+    // 시연 설정: 기본은 접혀 있고, 누르면 펼쳐진다
+    val demoCard: @Composable () -> Unit = {
+        DrCard {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 56.dp)
+                    .clickable { demoOpen = !demoOpen },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Button(
-                    onClick = { capture() },
-                    modifier = Modifier.fillMaxWidth().height(160.dp)
-                ) { Text("캡처", fontSize = 40.sp) }
-                Spacer(Modifier.height(8.dp))
+                Text("시연 설정", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "핸들 버튼(시험용: 키보드 C 키)으로도 캡처돼요.",
-                    style = MaterialTheme.typography.bodySmall
+                    if (demoOpen) "접기" else "펼치기",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DrTextSecondary
                 )
-                recallText?.let { text ->
-                    Spacer(Modifier.height(12.dp))
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "📍 $text",
-                            modifier = Modifier.padding(12.dp),
-                            style = MaterialTheme.typography.bodyMedium
+            }
+            if (demoOpen) {
+                DrButton(
+                    "시연 카메라 사진 등록 (현재 ${frameCount}장)",
+                    onClick = {
+                        multiPicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-                OutlinedButton(onClick = {
-                    multiPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }) { Text("시연 카메라 사진 등록 (현재 ${frameCount}장)") }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
                 if (frameCount == 0) {
                     Text(
                         "차량 카메라 대신 쓸 사진을 먼저 등록해 주세요.",
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DrTextSecondary
                     )
                 }
-
-                Spacer(Modifier.height(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(
-                        checked = demoMode,
-                        onCheckedChange = { on ->
-                            demoMode = on
-                            vehicle.setDemoMode(on)
-                            recallText = null
-                        }
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("시연 모드 (장소·속도가 정해진 순서로)")
-                }
-                OutlinedButton(onClick = { askReset = true }) { Text("시연 초기화 (장면 모두 지우기)") }
-            }
-        } else {
-            Text("오늘의 장면 ${moments.size}개", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
-            val newestFirst = moments.reversed()
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                itemsIndexed(newestFirst, key = { _, m -> m.id }) { index, m ->
-                    MomentItem(
-                        number = newestFirst.size - index,   // 화면에 보이는 번호: 항상 1, 2, 3… 순서대로
-                        moment = m,
-                        onPhotoClick = { zoomed = m },
-                        onDelete = {
-                            if (m.photoPath.isNotEmpty()) File(m.photoPath).delete()
-                            moments.removeAll { it.id == m.id }
-                            store.save(moments)
-                        },
-                        onMemoChange = { text ->
-                            val idx = moments.indexOfFirst { it.id == m.id }
-                            if (idx >= 0) {
-                                moments[idx] = moments[idx].copy(memo = text)
-                                store.save(moments)
-                            }
-                        },
-                        onStickerChange = { on ->
-                            val idx = moments.indexOfFirst { it.id == m.id }
-                            if (idx >= 0) {
-                                moments[idx] = moments[idx].copy(sticker = on)
-                                store.save(moments)
-                            }
-                        }
-                    )
-                }
+                DrSwitchRow(
+                    label = "시연 모드 (장소·속도가 정해진 순서로)",
+                    checked = demoMode,
+                    onCheckedChange = { on ->
+                        demoMode = on
+                        vehicle.setDemoMode(on)
+                        recallText = null
+                    }
+                )
+                DrDangerButton(
+                    "시연 초기화 (장면 모두 지우기)",
+                    onClick = { askReset = true },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "시험용: 키보드 C 키로도 캡처돼요.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DrTextSecondary
+                )
             }
         }
+    }
 
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(onClick = { isParked = !isParked }) {
-            Text(if (isParked) "주행으로 바꾸기" else "정차로 바꾸기")
-        }
+    // 주행 ↔ 정차 전환 버튼 (어두운 큰 버튼)
+    val modeButton: @Composable () -> Unit = {
+        DrLargeButton(
+            if (isParked) "주행으로 바꾸기" else "정차로 바꾸기",
+            onClick = { isParked = !isParked },
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+
+    val modeNote: @Composable () -> Unit = {
         Text(
             "※ 위 버튼은 시험용이에요. 나중에 차량 신호로 바뀝니다.",
-            style = MaterialTheme.typography.bodySmall
+            style = MaterialTheme.typography.bodySmall,
+            color = DrTextSecondary,
+            textAlign = TextAlign.Center
         )
+    }
+
+    // 정차 화면의 장면 카드 목록 (세로·가로가 같이 씀)
+    val momentList: @Composable (Modifier) -> Unit = { listModifier ->
+        val newestFirst = moments.reversed()
+        LazyColumn(
+            modifier = listModifier,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            itemsIndexed(newestFirst, key = { _, m -> m.id }) { index, m ->
+                MomentItem(
+                    number = newestFirst.size - index,   // 화면에 보이는 번호: 항상 1, 2, 3… 순서대로
+                    moment = m,
+                    onPhotoClick = { zoomed = m },
+                    onDelete = {
+                        if (m.photoPath.isNotEmpty()) File(m.photoPath).delete()
+                        moments.removeAll { it.id == m.id }
+                        store.save(moments)
+                    },
+                    onMemoChange = { text ->
+                        val idx = moments.indexOfFirst { it.id == m.id }
+                        if (idx >= 0) {
+                            moments[idx] = moments[idx].copy(memo = text)
+                            store.save(moments)
+                        }
+                    },
+                    onStickerChange = { on ->
+                        val idx = moments.indexOfFirst { it.id == m.id }
+                        if (idx >= 0) {
+                            moments[idx] = moments[idx].copy(sticker = on)
+                            store.save(moments)
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        // 가로로 넓은 화면(차량 디스플레이 등)이면 2열로
+        val wide = maxWidth > maxHeight && maxWidth >= 480.dp
+
+        if (wide && !isParked) {
+            // ---- 가로 주행 화면: 왼쪽 큰 캡처 버튼 / 오른쪽 정보와 전환 ----
+            Row(
+                modifier = Modifier.fillMaxSize().padding(20.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    DrCaptureButton("캡처", onClick = { capture() }, modifier = Modifier.fillMaxWidth().weight(1f))
+                    Text(
+                        "핸들 버튼으로도 저장",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DrTextSecondary
+                    )
+                }
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("주행 중", style = MaterialTheme.typography.headlineSmall)
+                    Spacer(Modifier.height(12.dp))
+                    Column(
+                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        recallCard()
+                        demoCard()
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    modeButton()
+                    Spacer(Modifier.height(8.dp))
+                    modeNote()
+                }
+            }
+        } else if (wide && isParked) {
+            // ---- 가로 정차 화면: 왼쪽 장면 카드 목록 / 오른쪽 제목과 전환 ----
+            Row(
+                modifier = Modifier.fillMaxSize().padding(20.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                momentList(Modifier.weight(1.6f).fillMaxHeight())
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("정차 중", style = MaterialTheme.typography.headlineSmall)
+                    Spacer(Modifier.height(8.dp))
+                    Text("오늘의 장면 ${moments.size}개", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.weight(1f))
+                    modeButton()
+                    Spacer(Modifier.height(8.dp))
+                    modeNote()
+                }
+            }
+        } else {
+            // ---- 세로 화면: 가로 최대 560dp로 가운데 정렬 ----
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                Column(
+                    modifier = Modifier.widthIn(max = 560.dp).fillMaxSize().padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        if (isParked) "정차 중" else "주행 중",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Spacer(Modifier.height(12.dp))
+
+                    if (!isParked) {
+                        // 내용이 길어져도 아래 버튼이 가려지지 않게 이 부분만 스크롤
+                        Column(
+                            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            DrCaptureButton("캡처", onClick = { capture() }, modifier = Modifier.fillMaxWidth())
+                            Text(
+                                "핸들 버튼으로도 저장",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DrTextSecondary
+                            )
+                            recallCard()
+                            demoCard()
+                        }
+                    } else {
+                        Text("오늘의 장면 ${moments.size}개", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.height(12.dp))
+                        momentList(Modifier.weight(1f))
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    modeButton()
+                    Spacer(Modifier.height(8.dp))
+                    modeNote()
+                }
+            }
+        }
     }
 
     // 시연 초기화: 실수로 누르지 않게 한 번 더 확인
@@ -252,7 +382,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                     recallText = null
                     vehicle.setDemoMode(demoMode)   // 시연 순서도 처음부터 다시
                     askReset = false
-                }) { Text("지우기") }
+                }) { Text("지우기", color = DrError) }
             },
             dismissButton = {
                 TextButton(onClick = { askReset = false }) { Text("취소") }
@@ -316,42 +446,65 @@ private fun MomentItem(
         else if (moment.sticker) StickerRender.apply(base, moment).asImageBitmap()
         else base.asImageBitmap()
     }
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("장면 $number", style = MaterialTheme.typography.titleMedium)
-            shown?.let {
-                Image(
-                    it, null,
-                    Modifier.fillMaxWidth().clickable(onClick = onPhotoClick),
-                    contentScale = ContentScale.FillWidth
-                )
-            }
-            Text("시각: ${moment.timeText}")
-            Text("주행 모드: ${moment.driveMode} · 속도: ${moment.speedKmh}km/h")
-            Text("장소: ${moment.placeName}")
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Switch(checked = moment.sticker, onCheckedChange = onStickerChange)
-                Spacer(Modifier.width(8.dp))
-                Text("차량 정보 스티커")
-            }
-            OutlinedTextField(
-                value = moment.memo,
-                onValueChange = onMemoChange,
-                label = { Text("한 줄 메모") },
-                modifier = Modifier.fillMaxWidth()
+
+    DrCard {
+        Text("장면 %02d".format(number), style = MaterialTheme.typography.titleMedium)
+
+        shown?.let {
+            Image(
+                it, null,
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(onClick = onPhotoClick),
+                contentScale = ContentScale.FillWidth
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onDelete) { Text("삭제") }
-                OutlinedButton(
-                    enabled = NaviHelper.hasLocation(moment),
-                    onClick = {
-                        if (!NaviHelper.open(context, moment)) {
-                            Toast.makeText(context, "길 안내를 열 수 없어요", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                ) { Text("다시 가기") }
-            }
-            ShareButton(moment)
         }
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("시각: ${moment.timeText}", style = MaterialTheme.typography.bodyMedium, color = DrTextSecondary)
+            Text(
+                "주행 모드: ${moment.driveMode} · 속도: ${moment.speedKmh}km/h",
+                style = MaterialTheme.typography.bodyMedium,
+                color = DrTextSecondary
+            )
+            Text("장소: ${moment.placeName}", style = MaterialTheme.typography.bodyMedium, color = DrTextSecondary)
+        }
+
+        DrSwitchRow("차량 정보 스티커", moment.sticker, onStickerChange)
+
+        OutlinedTextField(
+            value = moment.memo,
+            onValueChange = onMemoChange,
+            placeholder = { Text("한 줄 메모") },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = DrTextPrimary,
+                unfocusedTextColor = DrTextPrimary,
+                focusedBorderColor = DrAmber,
+                unfocusedBorderColor = DrOutline,
+                cursorColor = DrAmber,
+                focusedPlaceholderColor = DrTextSecondary,
+                unfocusedPlaceholderColor = DrTextSecondary
+            ),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp)
+        )
+
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            DrDangerButton("삭제", onClick = onDelete, modifier = Modifier.weight(1f))
+            DrButton(
+                "다시 가기",
+                onClick = {
+                    if (!NaviHelper.open(context, moment)) {
+                        Toast.makeText(context, "길 안내를 열 수 없어요", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                modifier = Modifier.weight(1f),
+                enabled = NaviHelper.hasLocation(moment)
+            )
+        }
+
+        ShareButton(moment, Modifier.fillMaxWidth())
     }
 }

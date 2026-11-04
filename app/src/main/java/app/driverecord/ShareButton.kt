@@ -3,14 +3,14 @@ package app.driverecord
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,8 +18,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
+import app.driverecord.ui.theme.DrError
+import app.driverecord.ui.theme.DrTextSecondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -32,9 +35,11 @@ fun ShareButton(moment: DriveMoment, modifier: Modifier = Modifier) {
     var qr by remember { mutableStateOf<Bitmap?>(null) }
     var errorText by remember { mutableStateOf<String?>(null) }
 
-    Column(modifier = modifier) {
-        OutlinedButton(
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        DrPrimaryButton(
+            text = if (busy) "올리는 중…" else "폰으로 보내기",
             enabled = !busy && moment.photoPath.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth(),
             onClick = {
                 busy = true
                 errorText = null
@@ -56,14 +61,12 @@ fun ShareButton(moment: DriveMoment, modifier: Modifier = Modifier) {
                     }
                 }
             }
-        ) {
-            Text(if (busy) "올리는 중…" else "폰으로 보내기")
-        }
+        )
 
         errorText?.let {
             Text(
                 text = it,
-                color = MaterialTheme.colorScheme.error,
+                color = DrError,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -75,20 +78,21 @@ fun ShareButton(moment: DriveMoment, modifier: Modifier = Modifier) {
             onDismissRequest = { qr = null },
             title = { Text("휴대폰 카메라로 찍어보세요") },
             text = {
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Image(
                         bitmap = code.asImageBitmap(),
                         contentDescription = "QR 코드",
-                        modifier = Modifier.size(260.dp)
+                        modifier = Modifier.size(260.dp).clip(RoundedCornerShape(12.dp))
                     )
                     Text(
                         text = "24시간 동안 사진을 볼 수 있어요.",
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DrTextSecondary
                     )
                 }
             },
             confirmButton = {
-                TextButton(onClick = { qr = null }) { Text("닫기") }
+                DrButton("닫기", onClick = { qr = null })
             }
         )
     }
