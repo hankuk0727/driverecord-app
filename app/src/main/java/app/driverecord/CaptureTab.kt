@@ -48,6 +48,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
     var isParked by remember { mutableStateOf(false) }
     var frameCount by remember { mutableStateOf(camera.frameCount()) }
     var zoomed by remember { mutableStateOf<DriveMoment?>(null) }
+    var recallText by remember { mutableStateOf<String?>(null) }   // 같은 장소 회상 안내
 
     val multiPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(10)
@@ -71,6 +72,10 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
         val id = nextId
         nextId += 1
         val place = vehicle.currentPlace()   // 이름과 좌표를 한 번에 받는다
+
+        // 이 장면을 넣기 전에, 같은 장소의 예전 장면이 있는지 찾는다
+        recallText = PlaceRecall.message(PlaceRecall.find(moments, place), place.name)
+
         moments.add(
             DriveMoment(
                 id = id,
@@ -79,7 +84,8 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                 placeName = place.name,
                 speedKmh = vehicle.currentSpeedKmh(),
                 latitude = place.latitude,
-                longitude = place.longitude
+                longitude = place.longitude,
+                createdAt = System.currentTimeMillis()
             )
         )
         store.save(moments)
@@ -140,6 +146,16 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                 "핸들 버튼(시험용: 키보드 C 키)으로도 캡처돼요.",
                 style = MaterialTheme.typography.bodySmall
             )
+            recallText?.let { text ->
+                Spacer(Modifier.height(12.dp))
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "📍 $text",
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
             Spacer(Modifier.height(16.dp))
             OutlinedButton(onClick = {
                 multiPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))

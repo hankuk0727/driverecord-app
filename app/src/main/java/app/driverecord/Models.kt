@@ -10,7 +10,8 @@ data class DriveMoment(
     val speedKmh: Int = 0,
     val sticker: Boolean = false,
     val latitude: Double = 0.0,    // 0.0, 0.0 이면 위치를 모르는 장면
-    val longitude: Double = 0.0
+    val longitude: Double = 0.0,
+    val createdAt: Long = 0L       // 저장한 시각(밀리초). 0이면 예전 장면이라 날짜를 모름
 )
 
 // 장소 이름과 좌표를 한 묶음으로 다룬다 (이름과 좌표가 어긋나지 않게)

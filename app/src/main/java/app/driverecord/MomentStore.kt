@@ -23,7 +23,8 @@ class MomentStore(context: Context) {
                     speedKmh = o.optInt("speedKmh", 0),
                     sticker = o.optBoolean("sticker", false),
                     latitude = o.optDouble("latitude", 0.0),
-                    longitude = o.optDouble("longitude", 0.0)
+                    longitude = o.optDouble("longitude", 0.0),
+                    createdAt = o.optLong("createdAt", 0L)
                 )
             }
         } catch (e: Exception) {
@@ -46,6 +47,7 @@ class MomentStore(context: Context) {
                     .put("sticker", m.sticker)
                     .put("latitude", m.latitude)
                     .put("longitude", m.longitude)
+                    .put("createdAt", m.createdAt)
             )
         }
         prefs.edit().putString("moments", arr.toString()).apply()
