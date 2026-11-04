@@ -8,6 +8,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -15,11 +17,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -41,6 +46,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
     var nextId by remember { mutableStateOf((moments.maxOfOrNull { it.id } ?: 0) + 1) }
     var isParked by remember { mutableStateOf(false) }
     var frameCount by remember { mutableStateOf(camera.frameCount()) }
+    var zoomed by remember { mutableStateOf<DriveMoment?>(null) }
 
     val multiPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(10)
@@ -152,6 +158,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                     MomentItem(
                         number = newestFirst.size - index,   // 화면에 보이는 번호: 항상 1, 2, 3… 순서대로
                         moment = m,
+                        onPhotoClick = { zoomed = m },
                         onDelete = {
                             if (m.photoPath.isNotEmpty()) File(m.photoPath).delete()
                             moments.removeAll { it.id == m.id }
@@ -185,12 +192,44 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.bodySmall
         )
     }
+
+    // 사진을 누르면 전체 화면으로 크게 보기 (스티커가 켜져 있으면 입혀진 채로)
+    zoomed?.let { z ->
+        val big = remember(z) {
+            if (z.photoPath.isEmpty()) null
+            else BitmapFactory.decodeFile(z.photoPath)?.let { b ->
+                (if (z.sticker) StickerRender.apply(b, z) else b).asImageBitmap()
+            }
+        }
+        Dialog(
+            onDismissRequest = { zoomed = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black)
+                    .clickable { zoomed = null },
+                contentAlignment = Alignment.Center
+            ) {
+                if (big != null) {
+                    Image(big, null, Modifier.fillMaxWidth(), contentScale = ContentScale.Fit)
+                }
+                Text(
+                    "화면을 누르면 닫혀요",
+                    color = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(24.dp)
+                )
+            }
+        }
+    }
 }
 
 @Composable
 private fun MomentItem(
     number: Int,
     moment: DriveMoment,
+    onPhotoClick: () -> Unit,
     onDelete: () -> Unit,
     onMemoChange: (String) -> Unit,
     onStickerChange: (Boolean) -> Unit
@@ -212,7 +251,11 @@ private fun MomentItem(
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("장면 $number", style = MaterialTheme.typography.titleMedium)
             shown?.let {
-                Image(it, null, Modifier.fillMaxWidth(), contentScale = ContentScale.FillWidth)
+                Image(
+                    it, null,
+                    Modifier.fillMaxWidth().clickable(onClick = onPhotoClick),
+                    contentScale = ContentScale.FillWidth
+                )
             }
             Text("시각: ${moment.timeText}")
             Text("주행 모드: ${moment.driveMode} · 속도: ${moment.speedKmh}km/h")

@@ -4,47 +4,53 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.RectF
 import android.graphics.Typeface
 
 object StickerRender {
-    // 스티커에 들어갈 글자들
+    // 필름 카메라 날짜 도장처럼 한 줄로: 시각 · 모드 · 속도 · 장소
     fun lines(m: DriveMoment): List<String> {
-        val list = mutableListOf(
-            m.timeText,
-            "${m.driveMode} 모드 · ${m.speedKmh}km/h",
-            m.placeName
-        )
+        val list = mutableListOf("${m.timeText} · ${m.driveMode} ${m.speedKmh}km/h · ${m.placeName}")
         if (m.memo.isNotBlank()) list.add(m.memo)
         return list
     }
 
-    // 사진 왼쪽 아래에 스티커를 그린 새 사진을 돌려줌 (원본은 그대로)
+    // 사진 오른쪽 아래에 작은 글씨를 입힌 새 사진을 돌려줌 (원본은 그대로)
     fun apply(src: Bitmap, m: DriveMoment): Bitmap {
         val out = src.copy(Bitmap.Config.ARGB_8888, true)
         val canvas = Canvas(out)
-        val unit = out.width / 40f
+        val margin = out.width * 0.025f
+        val maxTextWidth = out.width * 0.9f
 
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textSize = unit * 1.6f
-            typeface = Typeface.DEFAULT_BOLD
+        val shadow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(150, 0, 0, 0)
+            typeface = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
         }
-        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(170, 0, 0, 0)
+        val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(255, 154, 60)   // 필름 날짜 도장의 주황빛
+            typeface = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
+            textAlign = Paint.Align.RIGHT
         }
+        shadow.textAlign = Paint.Align.RIGHT
 
         val lines = lines(m)
-        val pad = unit
-        val lineH = textPaint.textSize * 1.35f
-        val boxW = lines.maxOf { textPaint.measureText(it) } + pad * 2
-        val boxH = lineH * lines.size + pad * 2
-        val left = unit
-        val top = out.height - boxH - unit
+        var size = out.width / 55f   // 작은 글씨
+        // 가장 긴 줄이 사진 너비를 넘지 않도록 줄임
+        while (size > 8f) {
+            text.textSize = size
+            if (lines.maxOf { text.measureText(it) } <= maxTextWidth) break
+            size -= 1f
+        }
+        text.textSize = size
+        shadow.textSize = size
 
-        canvas.drawRoundRect(RectF(left, top, left + boxW, top + boxH), unit, unit, bgPaint)
-        lines.forEachIndexed { i, s ->
-            canvas.drawText(s, left + pad, top + pad + textPaint.textSize * 0.85f + lineH * i, textPaint)
+        val lineH = size * 1.3f
+        val offset = size * 0.08f
+        // 아래 줄부터 위로 쌓기
+        for (i in lines.indices) {
+            val y = out.height - margin - lineH * (lines.size - 1 - i)
+            val x = out.width - margin
+            canvas.drawText(lines[i], x + offset, y + offset, shadow)
+            canvas.drawText(lines[i], x, y, text)
         }
         return out
     }
