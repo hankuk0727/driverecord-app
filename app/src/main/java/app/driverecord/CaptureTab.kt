@@ -36,6 +36,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
     val store = remember { MomentStore(context) }
     val camera = remember { DemoCamera(context) }
     val cameraSettings = remember { CameraSettings(context) }
+    val learner = remember { BonnetLearner(context) }
     val moments = remember { mutableStateListOf<DriveMoment>().apply { addAll(store.load()) } }
     var nextId by remember { mutableStateOf((moments.maxOfOrNull { it.id } ?: 0) + 1) }
     var isParked by remember { mutableStateOf(false) }
@@ -74,10 +75,22 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
         store.save(moments)
         tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
 
-        // 사진 가져오기 + 보정 + 저장은 뒤에서 처리 (캡처 반응은 바로 돌려줌)
+        // 사진 가져오기 + 보정 + 학습 + 저장은 뒤에서 처리 (캡처 반응은 바로 돌려줌)
         scope.launch(Dispatchers.Default) {
             val frame = camera.nextFrame() ?: return@launch
-            val fixed = ImageFix.apply(frame, cameraSettings.load())
+            val profile = cameraSettings.load()
+            val undist = ImageFix.undistorted(frame, profile.k)
+
+            // 보닛 비율: 기본은 사람이 맞춘 값, 자동 학습이 켜져 있고 학습이 되면 학습된 값
+            var cut = profile.cutFraction
+            if (cameraSettings.autoLearn()) {
+                learner.add(undist)
+                val learned = learner.learn().cut
+                cameraSettings.setLearnedCut(learned)
+                if (learned != null) cut = learned
+            }
+
+            val fixed = ImageFix.cropBottom(undist, profile.k, cut)
             val dir = File(context.filesDir, "moments").apply { mkdirs() }
             val file = File(dir, "moment_$id.jpg")
             FileOutputStream(file).use { fixed.bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }

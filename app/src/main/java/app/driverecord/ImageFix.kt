@@ -19,25 +19,29 @@ data class FixResult(
 object ImageFix {
     private const val MAX_SIDE = 1600
 
-    fun apply(src: Bitmap, profile: CameraProfile): FixResult {
+    // 왜곡을 펴고 아래를 자른 최종 결과
+    fun apply(src: Bitmap, profile: CameraProfile): FixResult =
+        cropBottom(undistorted(src, profile.k), profile.k, profile.cutFraction)
+
+    // 1단계: 왜곡만 편 사진 (보닛은 아직 남아 있음). 보닛 학습에 쓰여요.
+    fun undistorted(src: Bitmap, k: Double): Bitmap {
         val bmp = shrink(src)
         val w = bmp.width
         val h = bmp.height
         val px = IntArray(w * h)
         bmp.getPixels(px, 0, w, 0, 0, w, h)
-
-        val fixed = if (abs(profile.k) < 0.001) px else undistortRgb(px, w, h, profile.k)
-
-        val cut = (h * profile.cutFraction).toInt().coerceIn(0, h / 2)
-        val outH = h - cut
-        val out = Bitmap.createBitmap(w, outH, Bitmap.Config.ARGB_8888)
-        out.setPixels(fixed, 0, w, 0, 0, w, outH)
-        return FixResult(out, profile.k, cut > 0, cut)
+        val fixed = if (abs(k) < 0.001) px else undistortRgb(px, w, h, k)
+        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        out.setPixels(fixed, 0, w, 0, 0, w, h)
+        return out
     }
 
-    // 예전 화면(FixScreen)이 아직 쓰는 호출 방식. 다음 단계에서 화면을 바꾸면 쓰이지 않아요.
-    fun autoFix(src: Bitmap, forceK: Double? = null, cutBonnet: Boolean = true): FixResult =
-        apply(src, CameraProfile(forceK ?: -0.03, if (cutBonnet) 0.15 else 0.0))
+    // 2단계: 아래쪽 보닛 부분 잘라내기
+    fun cropBottom(bmp: Bitmap, k: Double, cutFraction: Double): FixResult {
+        val cut = (bmp.height * cutFraction).toInt().coerceIn(0, bmp.height / 2)
+        val out = if (cut == 0) bmp else Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height - cut)
+        return FixResult(out, k, cut > 0, cut)
+    }
 
     private fun shrink(b: Bitmap): Bitmap {
         val m = max(b.width, b.height)

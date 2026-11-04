@@ -6,6 +6,7 @@ import android.content.Context
 class CameraSettings(context: Context) {
     private val prefs = context.getSharedPreferences("camera_profile", Context.MODE_PRIVATE)
 
+    // 사람이 슬라이더로 맞춘 값
     fun load(): CameraProfile = CameraProfile(
         k = prefs.getFloat("k", -0.03f).toDouble(),
         cutFraction = prefs.getFloat("cut", 0.15f).toDouble()
@@ -17,15 +18,21 @@ class CameraSettings(context: Context) {
             .putFloat("cut", p.cutFraction.toFloat())
             .apply()
     }
-}
 
-data class SamplePhoto(val label: String, val resId: Int, val profile: CameraProfile)
+    // 보닛 자동 학습을 쓸지 (기본: 켬)
+    fun autoLearn(): Boolean = prefs.getBoolean("auto_learn", true)
 
-// 시연용 사진 3장과, 사진마다 눈으로 맞춰 본 추천값
-object SamplePhotos {
-    val all = listOf(
-        SamplePhoto("대구 시내", R.drawable.dashcam1, CameraProfile(-0.03, 0.17)),
-        SamplePhoto("한강", R.drawable.dashcam2, CameraProfile(-0.03, 0.15)),
-        SamplePhoto("광각", R.drawable.dashcam3, CameraProfile(-0.15, 0.24))
-    )
+    fun setAutoLearn(on: Boolean) {
+        prefs.edit().putBoolean("auto_learn", on).apply()
+    }
+
+    // 마지막으로 학습된 보닛 비율 (아직 없으면 null)
+    fun learnedCut(): Double? {
+        val v = prefs.getFloat("learned_cut", -1f)
+        return if (v < 0f) null else v.toDouble()
+    }
+
+    fun setLearnedCut(cut: Double?) {
+        prefs.edit().putFloat("learned_cut", cut?.toFloat() ?: -1f).apply()
+    }
 }
