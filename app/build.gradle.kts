@@ -20,6 +20,9 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // 주행 규제(CarUxRestrictions) 조회용 자동차 API. 실제 기능은 차량 시스템이 제공한다.
+    useLibrary("android.car")
+
     buildTypes {
         release {
             optimization {
@@ -53,6 +56,9 @@ dependencies {
     implementation(libs.firebase.firestore)
     implementation(libs.zxing.core)
     implementation(libs.coroutines.play.services)
+
+    // Pleos 차량 SDK (Vehicle State)
+    implementation("ai.pleos.playground:Vehicle:2.3.2")
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

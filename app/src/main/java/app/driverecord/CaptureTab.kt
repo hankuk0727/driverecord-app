@@ -54,7 +54,20 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
     val learner = remember { BonnetLearner(context) }
     val moments = remember { mutableStateListOf<DriveMoment>().apply { addAll(store.load()) } }
     var nextId by remember { mutableStateOf((moments.maxOfOrNull { it.id } ?: 0) + 1) }
-    var isParked by remember { mutableStateOf(false) }
+
+    // 차량의 주행 신호를 받는다. 차량이 아닌 기기(휴대폰)에서는 available 이 false 로 남는다.
+    val monitor = remember { DrivingMonitor(context) }
+    DisposableEffect(Unit) {
+        monitor.start()
+        onDispose { monitor.stop() }
+    }
+    var manualParked by remember { mutableStateOf(false) }   // 시험용 버튼 값 (차량 신호가 없을 때만 사용)
+
+    // 지금 정차 중인가: 차량 신호가 있으면 그것을, 없으면 시험용 버튼 값을 쓴다
+    // (함수로 만든 이유: 핸들 버튼 동작이 항상 최신 값을 읽도록)
+    fun parkedNow(): Boolean = if (monitor.available) !monitor.driving else manualParked
+    val isParked = parkedNow()
+
     var frameCount by remember { mutableStateOf(camera.frameCount()) }
     var zoomed by remember { mutableStateOf<DriveMoment?>(null) }
     var recallText by remember { mutableStateOf<String?>(null) }   // 같은 장소 회상 안내
@@ -80,7 +93,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
 
     // 화면 버튼과 핸들 버튼이 함께 쓰는 캡처 동작. 정차 중이면 무시(false).
     fun capture(): Boolean {
-        if (isParked) return false
+        if (parkedNow()) return false
         val id = nextId
         nextId += 1
         val place = vehicle.currentPlace()   // 이름과 좌표를 한 번에 받는다
@@ -208,18 +221,21 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
         }
     }
 
-    // 주행 ↔ 정차 전환 버튼 (어두운 큰 버튼)
+    // 주행 ↔ 정차 전환 버튼 (시험용). 차량 신호를 받고 있을 때는 보이지 않는다.
     val modeButton: @Composable () -> Unit = {
-        DrLargeButton(
-            if (isParked) "주행으로 바꾸기" else "정차로 바꾸기",
-            onClick = { isParked = !isParked },
-            modifier = Modifier.fillMaxWidth()
-        )
+        if (!monitor.available) {
+            DrLargeButton(
+                if (isParked) "주행으로 바꾸기" else "정차로 바꾸기",
+                onClick = { manualParked = !manualParked },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 
     val modeNote: @Composable () -> Unit = {
         Text(
-            "※ 위 버튼은 시험용이에요. 나중에 차량 신호로 바뀝니다.",
+            if (monitor.available) "차량 신호에 따라 자동으로 바뀌어요."
+            else "※ 위 버튼은 시험용이에요. 차량에서는 신호로 바뀝니다.",
             style = MaterialTheme.typography.bodySmall,
             color = DrTextSecondary,
             textAlign = TextAlign.Center
