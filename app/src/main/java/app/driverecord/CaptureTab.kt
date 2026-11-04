@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioManager
 import android.media.ToneGenerator
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -69,13 +70,16 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
         if (isParked) return false
         val id = nextId
         nextId += 1
+        val place = vehicle.currentPlace()   // 이름과 좌표를 한 번에 받는다
         moments.add(
             DriveMoment(
                 id = id,
                 timeText = SimpleDateFormat("HH:mm:ss", Locale.KOREA).format(Date()),
                 driveMode = vehicle.currentDriveMode(),
-                placeName = vehicle.currentPlaceName(),
-                speedKmh = vehicle.currentSpeedKmh()
+                placeName = place.name,
+                speedKmh = vehicle.currentSpeedKmh(),
+                latitude = place.latitude,
+                longitude = place.longitude
             )
         )
         store.save(moments)
@@ -234,6 +238,8 @@ private fun MomentItem(
     onMemoChange: (String) -> Unit,
     onStickerChange: (Boolean) -> Unit
 ) {
+    val context = LocalContext.current
+
     // 사진은 한 번만 읽고, 스티커는 켜져 있을 때만 그 위에 입혀서 보여줌
     val base = remember(moment.photoPath) {
         if (moment.photoPath.isEmpty()) null
@@ -273,8 +279,16 @@ private fun MomentItem(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onDelete) { Text("삭제") }
-                ShareButton(moment)
+                OutlinedButton(
+                    enabled = NaviHelper.hasLocation(moment),
+                    onClick = {
+                        if (!NaviHelper.open(context, moment)) {
+                            Toast.makeText(context, "길 안내를 열 수 없어요", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) { Text("다시 가기") }
             }
+            ShareButton(moment)
         }
     }
 }

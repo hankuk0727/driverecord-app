@@ -21,7 +21,9 @@ class MomentStore(context: Context) {
                     memo = o.optString("memo", ""),
                     photoPath = o.optString("photoPath", ""),
                     speedKmh = o.optInt("speedKmh", 0),
-                    sticker = o.optBoolean("sticker", false)
+                    sticker = o.optBoolean("sticker", false),
+                    latitude = o.optDouble("latitude", 0.0),
+                    longitude = o.optDouble("longitude", 0.0)
                 )
             }
         } catch (e: Exception) {
@@ -42,6 +44,8 @@ class MomentStore(context: Context) {
                     .put("photoPath", m.photoPath)
                     .put("speedKmh", m.speedKmh)
                     .put("sticker", m.sticker)
+                    .put("latitude", m.latitude)
+                    .put("longitude", m.longitude)
             )
         }
         prefs.edit().putString("moments", arr.toString()).apply()
