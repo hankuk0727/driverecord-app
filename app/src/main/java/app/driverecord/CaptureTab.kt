@@ -14,6 +14,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -49,6 +51,8 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
     var frameCount by remember { mutableStateOf(camera.frameCount()) }
     var zoomed by remember { mutableStateOf<DriveMoment?>(null) }
     var recallText by remember { mutableStateOf<String?>(null) }   // 같은 장소 회상 안내
+    var demoMode by remember { mutableStateOf(vehicle.isDemoMode()) }
+    var askReset by remember { mutableStateOf(false) }             // 시연 초기화 확인 창
 
     val multiPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(10)
@@ -137,34 +141,55 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
         Spacer(Modifier.height(12.dp))
 
         if (!isParked) {
-            Button(
-                onClick = { capture() },
-                modifier = Modifier.fillMaxWidth().height(160.dp)
-            ) { Text("캡처", fontSize = 40.sp) }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "핸들 버튼(시험용: 키보드 C 키)으로도 캡처돼요.",
-                style = MaterialTheme.typography.bodySmall
-            )
-            recallText?.let { text ->
-                Spacer(Modifier.height(12.dp))
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "📍 $text",
-                        modifier = Modifier.padding(12.dp),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-            OutlinedButton(onClick = {
-                multiPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-            }) { Text("시연 카메라 사진 등록 (현재 ${frameCount}장)") }
-            if (frameCount == 0) {
+            // 내용이 길어져도 아래 "정차로 바꾸기" 버튼이 가려지지 않게 이 부분만 스크롤
+            Column(
+                modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Button(
+                    onClick = { capture() },
+                    modifier = Modifier.fillMaxWidth().height(160.dp)
+                ) { Text("캡처", fontSize = 40.sp) }
+                Spacer(Modifier.height(8.dp))
                 Text(
-                    "차량 카메라 대신 쓸 사진을 먼저 등록해 주세요.",
+                    "핸들 버튼(시험용: 키보드 C 키)으로도 캡처돼요.",
                     style = MaterialTheme.typography.bodySmall
                 )
+                recallText?.let { text ->
+                    Spacer(Modifier.height(12.dp))
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "📍 $text",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                OutlinedButton(onClick = {
+                    multiPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }) { Text("시연 카메라 사진 등록 (현재 ${frameCount}장)") }
+                if (frameCount == 0) {
+                    Text(
+                        "차량 카메라 대신 쓸 사진을 먼저 등록해 주세요.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(
+                        checked = demoMode,
+                        onCheckedChange = { on ->
+                            demoMode = on
+                            vehicle.setDemoMode(on)
+                            recallText = null
+                        }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("시연 모드 (장소·속도가 정해진 순서로)")
+                }
+                OutlinedButton(onClick = { askReset = true }) { Text("시연 초기화 (장면 모두 지우기)") }
             }
         } else {
             Text("오늘의 장면 ${moments.size}개", style = MaterialTheme.typography.titleMedium)
@@ -210,6 +235,28 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
         Text(
             "※ 위 버튼은 시험용이에요. 나중에 차량 신호로 바뀝니다.",
             style = MaterialTheme.typography.bodySmall
+        )
+    }
+
+    // 시연 초기화: 실수로 누르지 않게 한 번 더 확인
+    if (askReset) {
+        AlertDialog(
+            onDismissRequest = { askReset = false },
+            title = { Text("모든 장면을 지울까요?") },
+            text = { Text("저장된 장면 ${moments.size}개와 사진이 모두 지워져요. 되돌릴 수 없어요.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    moments.forEach { if (it.photoPath.isNotEmpty()) File(it.photoPath).delete() }
+                    moments.clear()
+                    store.save(moments)
+                    recallText = null
+                    vehicle.setDemoMode(demoMode)   // 시연 순서도 처음부터 다시
+                    askReset = false
+                }) { Text("지우기") }
+            },
+            dismissButton = {
+                TextButton(onClick = { askReset = false }) { Text("취소") }
+            }
         )
     }
 
