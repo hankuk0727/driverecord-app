@@ -271,7 +271,10 @@ private fun MomentItem(
                 label = { Text("한 줄 메모") },
                 modifier = Modifier.fillMaxWidth()
             )
-            OutlinedButton(onClick = onDelete) { Text("삭제") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onDelete) { Text("삭제") }
+                ShareButton(moment)
+            }
         }
     }
 }
