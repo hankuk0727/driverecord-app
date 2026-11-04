@@ -1,6 +1,7 @@
 package app.driverecord
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.toggleable
@@ -26,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
@@ -46,8 +49,8 @@ import app.driverecord.ui.theme.DrTextSecondary
 
 // 앱 전체에서 같이 쓰는 버튼·카드·스위치 부품. 크기나 색을 바꿀 때는 여기만 고치면 된다.
 //
-// 강조 규칙: 밝게 채우는 버튼(DrPrimaryButton, DrCaptureButton)은 한 화면에 하나만 쓴다.
-// 나머지(DrButton, DrLargeButton, DrDangerButton)는 어두운 버튼이다.
+// 강조 규칙: 밝게 채우는 버튼(DrPrimaryButton)은 한 화면에 하나만 쓴다.
+// 나머지(DrButton, DrLargeButton, DrDangerButton, DrCaptureButton)는 어두운 카드 모양이다.
 
 private val ButtonShape = RoundedCornerShape(12.dp)
 private val ButtonPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
@@ -134,7 +137,7 @@ fun DrDangerButton(
     BorderStroke(1.dp, DrOutlineVariant)
 )
 
-// 캡처 버튼: 가로 전체, 최소 높이 160dp, 모서리 24dp, 글자 32sp
+// 캡처 버튼: 어두운 카드 + 셔터 모양 링 + 글자 32sp. 가로 전체, 최소 높이 160dp, 모서리 24dp
 @Composable
 fun DrCaptureButton(
     text: String,
@@ -144,19 +147,32 @@ fun DrCaptureButton(
     Button(
         onClick = onClick,
         shape = RoundedCornerShape(24.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = DrAmber, contentColor = DrOnAmber),
+        border = BorderStroke(1.dp, DrOutlineVariant),
+        colors = ButtonDefaults.buttonColors(containerColor = DrSurface, contentColor = DrTextPrimary),
         modifier = modifier.heightIn(min = 160.dp)
     ) {
-        Text(
-            text,
-            style = TextStyle(
-                fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                fontSize = 32.sp,
-                lineHeight = 40.sp
-            ),
-            textAlign = TextAlign.Center
-        )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // 셔터: 바깥 링 + 안쪽 채운 원
+            Canvas(Modifier.size(72.dp)) {
+                val ring = 5.dp.toPx()
+                val r = size.minDimension / 2f
+                drawCircle(DrAmber, radius = r - ring / 2f, style = Stroke(width = ring))
+                drawCircle(DrAmber, radius = r - ring * 2.4f)
+            }
+            Text(
+                text,
+                style = TextStyle(
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.SansSerif,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+                    fontSize = 32.sp,
+                    lineHeight = 40.sp
+                ),
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 

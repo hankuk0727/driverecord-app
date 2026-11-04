@@ -115,7 +115,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                 learner.add(undist)
                 val learned = learner.learn().cut
                 cameraSettings.setLearnedCut(learned)
-                if (learned != null) cut = learned
+                if (learned != null && learned >= 0.03) cut = learned   // 너무 작으면 못 찾은 것으로 보고 기본값 사용
             }
 
             val fixed = ImageFix.cropBottom(undist, profile.k, cut)

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -37,7 +38,7 @@ import app.driverecord.ui.theme.DrTextSecondary
 fun AppRoot(vehicle: VehicleDataSource) {
     var tab by remember { mutableStateOf(0) }
 
-    // 선택은 포인트색 글자·아이콘 + 어두운 알약, 비선택은 보조 글자색
+    // 선택은 포인트색 아이콘·글자 + 어두운 표시, 비선택은 보조 글자색
     val barColors = NavigationBarItemDefaults.colors(
         selectedIconColor = DrAmber,
         selectedTextColor = DrAmber,
@@ -52,6 +53,14 @@ fun AppRoot(vehicle: VehicleDataSource) {
         unselectedIconColor = DrTextSecondary,
         unselectedTextColor = DrTextSecondary
     )
+
+    // 탭 아이콘: 선택/비선택에 따라 정해진 색(LocalContentColor)을 그대로 씀
+    val captureIcon: @Composable () -> Unit = {
+        DrIcon(DrIconKind.Camera, LocalContentColor.current, iconSize = 28.dp)
+    }
+    val fixIcon: @Composable () -> Unit = {
+        DrIcon(DrIconKind.Tune, LocalContentColor.current, iconSize = 28.dp)
+    }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(DrBackground)) {
         // 가로로 넓은 화면(차량 디스플레이 등)이면 탭을 왼쪽 세로 막대로
@@ -70,14 +79,14 @@ fun AppRoot(vehicle: VehicleDataSource) {
                         NavigationBarItem(
                             selected = tab == 0,
                             onClick = { tab = 0 },
-                            icon = { Text("●", style = MaterialTheme.typography.titleMedium) },
+                            icon = captureIcon,
                             label = { Text("캡처", style = MaterialTheme.typography.labelMedium) },
                             colors = barColors
                         )
                         NavigationBarItem(
                             selected = tab == 1,
                             onClick = { tab = 1 },
-                            icon = { Text("✦", style = MaterialTheme.typography.titleMedium) },
+                            icon = fixIcon,
                             label = { Text("사진 보정", style = MaterialTheme.typography.labelMedium) },
                             colors = barColors
                         )
@@ -95,14 +104,14 @@ fun AppRoot(vehicle: VehicleDataSource) {
                         NavigationRailItem(
                             selected = tab == 0,
                             onClick = { tab = 0 },
-                            icon = { Text("●", style = MaterialTheme.typography.titleMedium) },
+                            icon = captureIcon,
                             label = { Text("캡처", style = MaterialTheme.typography.labelMedium) },
                             colors = railColors
                         )
                         NavigationRailItem(
                             selected = tab == 1,
                             onClick = { tab = 1 },
-                            icon = { Text("✦", style = MaterialTheme.typography.titleMedium) },
+                            icon = fixIcon,
                             label = { Text("사진 보정", style = MaterialTheme.typography.labelMedium) },
                             colors = railColors
                         )
