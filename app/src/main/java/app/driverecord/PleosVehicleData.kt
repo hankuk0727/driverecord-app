@@ -20,6 +20,7 @@ import android.util.Log
 //  - 주행 모드: Vehicle SDK DrivingMode (일반/에코/스포츠)
 //  - 현재 위치: NaviHelper getCurrentLocationInfo (5초마다 갱신)
 //  - 속도: 안드로이드 표준 CarPropertyManager PERF_VEHICLE_SPEED (m/s를 km/h로 환산)
+//    CAR_SPEED 권한은 실행 중 허락받는 종류라서, 허락 전에는 가짜 값을 쓴다.
 // 시연 모드가 켜져 있으면 항상 가짜 값의 정해진 순서를 쓴다.
 class PleosVehicleData(context: Context) : VehicleDataSource {
 
@@ -78,6 +79,9 @@ class PleosVehicleData(context: Context) : VehicleDataSource {
         }
     }
 
+    // 차량에서 실행 중인지 (폰이면 false)
+    fun isOnCar(): Boolean = onCar
+
     // 화면이 보이는 동안 시작한다. 폰에서는 아무것도 하지 않는다.
     fun start() {
         if (!onCar || running) return
@@ -86,6 +90,12 @@ class PleosVehicleData(context: Context) : VehicleDataSource {
         connectNavi()
         connectSpeed()
         handler.post(poll)
+    }
+
+    // 속도 권한을 새로 받은 뒤 다시 시도한다.
+    fun retrySpeed() {
+        if (!onCar) return
+        connectSpeed()
     }
 
     // 화면이 사라지면 위치 갱신만 멈춘다.
@@ -150,14 +160,15 @@ class PleosVehicleData(context: Context) : VehicleDataSource {
         }
     }
 
-    // 속도: 못 받으면(권한 없음 등) speedKmh가 null로 남아 가짜 값이 쓰인다.
+    // 속도: 권한이 없거나 못 받으면 speedKmh가 null로 남아 가짜 값이 쓰인다.
     // 계기판과 같은 값(PERF_VEHICLE_SPEED)을 먼저, 안 되면 표시용 속도(PERF_VEHICLE_SPEED_DISPLAY)를 시도한다.
     private fun connectSpeed() {
         if (propertyManager != null) return
+        val granted = app.checkSelfPermission("android.car.permission.CAR_SPEED") ==
+                PackageManager.PERMISSION_GRANTED
+        Log.d(TAG, "CAR_SPEED granted=$granted")
+        if (!granted) return   // 권한을 받은 뒤 retrySpeed()로 다시 시도한다
         try {
-            val granted = app.checkSelfPermission("android.car.permission.CAR_SPEED") ==
-                    PackageManager.PERMISSION_GRANTED
-            Log.d(TAG, "CAR_SPEED granted=$granted")
             val c = Car.createCar(app)
             car = c
             val manager = c?.getCarManager(Car.PROPERTY_SERVICE) as? CarPropertyManager
@@ -166,22 +177,21 @@ class PleosVehicleData(context: Context) : VehicleDataSource {
                 return
             }
             propertyManager = manager
-            Log.d(TAG, "car property count=${manager.propertyList.size}")
             val ids = listOf(
                 VehiclePropertyIds.PERF_VEHICLE_SPEED,
                 VehiclePropertyIds.PERF_VEHICLE_SPEED_DISPLAY
             )
             for (id in ids) {
-                val available = manager.isPropertyAvailable(id, 0)
                 val registered = manager.registerCallback(
                     speedCallback,
                     id,
                     CarPropertyManager.SENSOR_RATE_NORMAL
                 )
-                Log.d(TAG, "speed prop=$id available=$available registered=$registered")
+                Log.d(TAG, "speed prop=$id registered=$registered")
                 if (registered) break
             }
         } catch (t: Throwable) {
+            propertyManager = null
             Log.w(TAG, "speed connect failed", t)
         }
     }
