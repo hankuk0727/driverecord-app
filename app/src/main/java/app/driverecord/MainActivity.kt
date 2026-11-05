@@ -8,7 +8,24 @@ import androidx.activity.enableEdgeToEdge
 import app.driverecord.ui.theme.DriveRecordTheme
 
 class MainActivity : ComponentActivity() {
-    private val vehicle: VehicleDataSource = FakeVehicleData()
+    // 차량에서는 진짜 값, 폰에서는 가짜 값 (Context는 onCreate 이후에 쓸 수 있어서 lazy)
+    private val pleosVehicle by lazy { PleosVehicleData(this) }
+    private val vehicle: VehicleDataSource by lazy { pleosVehicle }
+
+    override fun onStart() {
+        super.onStart()
+        pleosVehicle.start()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        pleosVehicle.pause()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        pleosVehicle.release()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
