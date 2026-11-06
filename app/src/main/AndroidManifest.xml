@@ -7,7 +7,9 @@
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
     <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
     <uses-permission android:name="pleos.car.permission.NAVI_CUSTOM_MAP" />
+    <!-- Pleos Vehicle SDK 권한: 주행 모드 읽기 -->
     <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
+    <!-- AAOS 표준 권한: 차량 속도 읽기 -->
     <uses-permission android:name="android.car.permission.CAR_SPEED" />
     <application
         android:allowBackup="true"
