@@ -12,8 +12,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -242,12 +243,14 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
         )
     }
 
-    // 정차 화면의 장면 카드 목록 (세로·가로가 같이 씀)
-    val momentList: @Composable (Modifier) -> Unit = { listModifier ->
+    // 정차 화면의 장면 카드 목록 (세로·가로가 같이 씀). columns 로 한 줄에 몇 장 놓을지 정한다.
+    val momentList: @Composable (Modifier, GridCells) -> Unit = { listModifier, columns ->
         val newestFirst = moments.reversed()
-        LazyColumn(
+        LazyVerticalGrid(
+            columns = columns,
             modifier = listModifier,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             itemsIndexed(newestFirst, key = { _, m -> m.id }) { index, m ->
                 MomentItem(
@@ -285,8 +288,8 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
         if (wide && !isParked) {
             // ---- 가로 주행 화면: 왼쪽 큰 캡처 버튼 / 오른쪽 정보와 전환 ----
             Row(
-                modifier = Modifier.fillMaxSize().padding(20.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
+                modifier = Modifier.fillMaxSize().padding(24.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 Column(
                     modifier = Modifier.weight(1f).fillMaxHeight(),
@@ -321,30 +324,31 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                 }
             }
         } else if (wide && isParked) {
-            // ---- 가로 정차 화면: 왼쪽 장면 카드 목록 / 오른쪽 제목과 전환 ----
-            Row(
-                modifier = Modifier.fillMaxSize().padding(20.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
+            // ---- 가로 정차 화면: 위에 제목 한 줄 / 가운데 장면 카드(폭에 맞춰 여러 열) / 아래 전환 ----
+            Column(
+                modifier = Modifier.fillMaxSize().padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                momentList(Modifier.weight(1.6f).fillMaxHeight())
-                Column(
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text("정차 중", style = MaterialTheme.typography.headlineSmall)
-                    Spacer(Modifier.height(8.dp))
                     Text("오늘의 장면 ${moments.size}개", style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.weight(1f))
-                    modeButton()
-                    Spacer(Modifier.height(8.dp))
-                    modeNote()
                 }
+                Spacer(Modifier.height(12.dp))
+                momentList(Modifier.weight(1f).fillMaxWidth(), GridCells.Adaptive(560.dp))
+                Spacer(Modifier.height(12.dp))
+                Box(Modifier.widthIn(max = 560.dp)) { modeButton() }
+                Spacer(Modifier.height(8.dp))
+                modeNote()
             }
         } else {
-            // ---- 세로 화면: 가로 최대 560dp로 가운데 정렬 ----
+            // ---- 세로 화면: 가로 최대 840dp(차량 세로 창 폭)로 가운데 정렬 ----
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 Column(
-                    modifier = Modifier.widthIn(max = 560.dp).fillMaxSize().padding(20.dp),
+                    modifier = Modifier.widthIn(max = 840.dp).fillMaxSize().padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
@@ -372,7 +376,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                     } else {
                         Text("오늘의 장면 ${moments.size}개", style = MaterialTheme.typography.titleMedium)
                         Spacer(Modifier.height(12.dp))
-                        momentList(Modifier.weight(1f))
+                        momentList(Modifier.weight(1f), GridCells.Fixed(1))
                     }
 
                     Spacer(Modifier.height(12.dp))

@@ -1,5 +1,6 @@
 package app.driverecord
 
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.widget.Toast
@@ -55,6 +56,7 @@ fun FixScreen(modifier: Modifier = Modifier) {
     val settings = remember { CameraSettings(context) }
     val learner = remember { BonnetLearner(context) }
     val saved = remember { settings.load() }
+    val car = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE) }
 
     var original by remember { mutableStateOf<Bitmap?>(null) }
     var result by remember { mutableStateOf<FixResult?>(null) }
@@ -88,23 +90,26 @@ fun FixScreen(modifier: Modifier = Modifier) {
         busy = false
     }
 
+    // 슬라이더: 채워진 부분은 공식 filled 버튼 색, 나머지 길은 공식 surface/accent 회색
     val sliderColors = SliderDefaults.colors(
         thumbColor = DrAmber,
         activeTrackColor = DrAmber,
         inactiveTrackColor = DrSurfaceHigh
     )
+    val sliderHeight = if (car) 64.dp else 48.dp
     val photoShape = RoundedCornerShape(12.dp)
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        val wide = maxWidth >= 600.dp
+        // 원본/보정을 나란히 보여 줄 만큼 넓은지 (차량 세로 창 840dp는 위아래로 쌓음)
+        val wide = maxWidth >= 900.dp
 
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             Column(
                 modifier = Modifier
-                    .widthIn(max = if (wide) 1000.dp else 560.dp)
+                    .widthIn(max = if (wide) 1000.dp else 840.dp)
                     .fillMaxSize()
                     .verticalScroll(rememberScrollState())
-                    .padding(20.dp),
+                    .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
@@ -133,15 +138,16 @@ fun FixScreen(modifier: Modifier = Modifier) {
                         style = MaterialTheme.typography.bodyMedium,
                         color = DrTextSecondary
                     )
+                    // 캡처할 때는 3% 미만이면 못 찾은 것으로 보고 슬라이더 값을 쓴다. 안내 문구도 같은 기준으로 맞춘다.
                     val learned = learnStatus.cut
                     Text(
                         when {
                             learnStatus.frames < BonnetLearner.MIN_FRAMES ->
-                                "모인 사진 ${learnStatus.frames}장 · 아직 학습 전 (슬라이더 값 사용 중)"
-                            learned == null ->
-                                "모인 사진 ${learnStatus.frames}장 · 장면 변화가 적어 학습 못 함 (슬라이더 값 사용 중)"
+                                "모인 사진 ${learnStatus.frames}장 · 아직 학습 전이에요 (슬라이더 값 사용 중)"
+                            learned == null || learned < 0.03 ->
+                                "모인 사진 ${learnStatus.frames}장 · 보닛을 찾지 못했어요 (슬라이더 값 사용 중)"
                             else ->
-                                "모인 사진 ${learnStatus.frames}장 · 학습된 보닛 ${(learned * 100).toInt()}% 적용 중"
+                                "모인 사진 ${learnStatus.frames}장 · 보닛을 찾았어요 (사진 아래 ${(learned * 100).toInt()}% 잘라내는 중)"
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = DrTextPrimary
@@ -243,7 +249,7 @@ fun FixScreen(modifier: Modifier = Modifier) {
                         onValueChange = { strength = it },
                         valueRange = 0f..0.3f,
                         colors = sliderColors,
-                        modifier = Modifier.heightIn(min = 48.dp)
+                        modifier = Modifier.heightIn(min = sliderHeight)
                     )
                     Text(
                         "아래 보닛 잘라내기  ${(cut * 100).toInt()}%",
@@ -255,7 +261,7 @@ fun FixScreen(modifier: Modifier = Modifier) {
                         onValueChange = { cut = it },
                         valueRange = 0f..0.4f,
                         colors = sliderColors,
-                        modifier = Modifier.heightIn(min = 48.dp)
+                        modifier = Modifier.heightIn(min = sliderHeight)
                     )
                 }
 

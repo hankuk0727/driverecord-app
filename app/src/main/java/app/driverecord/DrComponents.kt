@@ -1,5 +1,6 @@
 package app.driverecord
 
+import android.content.pm.PackageManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,15 +25,16 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.driverecord.ui.theme.AstaSans
@@ -52,12 +54,21 @@ import app.driverecord.ui.theme.DrTextPrimary
 //
 // Pleos 공식 디자인 파일의 모양을 따른다.
 // - 버튼/카드에는 테두리선이 없고, 바탕보다 살짝 밝은 면으로만 구분한다. (공식: 반투명 흰색 5~10%)
-// - 모서리: 큰 버튼 24, 작은 버튼 16, 카드 24, 캡처 카드 32 (공식 비율을 폰 크기에 맞춰 줄임)
+// - 차량(Connect-S 17인치 기준, 공식값): 큰 버튼 높이 100·모서리 32·좌우 여백 40,
+//   일반 버튼 높이 80·모서리 24·좌우 여백 32, 카드 모서리 24·안쪽 여백 24.
+// - 휴대폰은 화면이 작아 같은 크기가 너무 크므로 줄인 값을 쓴다(큰 72·일반 56).
 // - 밝게 채우는 버튼(DrPrimaryButton)은 한 화면에 하나만 쓴다.
 
-private val LargeShape = RoundedCornerShape(24.dp)
-private val SmallShape = RoundedCornerShape(16.dp)
-private val ButtonPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+// 차량(Automotive)인지 알려 준다. 부품 크기를 차량/휴대폰에서 다르게 하기 위해 쓴다.
+@Composable
+private fun isCar(): Boolean {
+    val context = LocalContext.current
+    return remember {
+        context.packageManager.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)
+    }
+}
+
+private enum class ButtonSize { Large, Medium }
 
 // 공통 버튼 모양. 글자는 필요하면 2줄까지 늘어나고 말줄임하지 않는다.
 @Composable
@@ -66,17 +77,37 @@ private fun DrButtonBase(
     onClick: () -> Unit,
     modifier: Modifier,
     enabled: Boolean,
-    minHeight: Dp,
-    shape: RoundedCornerShape,
+    size: ButtonSize,
     container: Color,
     content: Color,
     textStyle: TextStyle
 ) {
+    val car = isCar()
+    val large = size == ButtonSize.Large
+    val minHeight = when {
+        car && large -> 100.dp
+        car -> 80.dp
+        large -> 72.dp
+        else -> 56.dp
+    }
+    val shape = RoundedCornerShape(
+        when {
+            car && large -> 32.dp
+            large -> 24.dp
+            car -> 24.dp
+            else -> 16.dp
+        }
+    )
+    val horizontal = when {
+        car && large -> 40.dp
+        car -> 32.dp
+        else -> 24.dp
+    }
     Button(
         onClick = onClick,
         enabled = enabled,
         shape = shape,
-        contentPadding = ButtonPadding,
+        contentPadding = PaddingValues(horizontal = horizontal, vertical = 12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = container,
             contentColor = content,
@@ -89,41 +120,47 @@ private fun DrButtonBase(
     }
 }
 
-// 주요 버튼: 밝게 채움(공식 button/filled), 최소 높이 72dp (화면의 가장 중요한 행동 하나에만)
+// 주요 버튼: 밝게 채움(공식 button/filled), 큰 크기 (화면의 가장 중요한 행동 하나에만)
 @Composable
 fun DrPrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true
-) = DrButtonBase(
-    text, onClick, modifier, enabled, 72.dp, LargeShape,
-    DrAmber, DrOnAmber, MaterialTheme.typography.labelLarge
-)
+) {
+    DrButtonBase(
+        text, onClick, modifier, enabled, ButtonSize.Large,
+        DrAmber, DrOnAmber, MaterialTheme.typography.labelLarge
+    )
+}
 
-// 큰 일반 버튼: 모드 전환처럼 크게 눌러야 하지만 강조는 낮은 행동, 최소 높이 72dp
+// 큰 일반 버튼: 모드 전환처럼 크게 눌러야 하지만 강조는 낮은 행동
 @Composable
 fun DrLargeButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true
-) = DrButtonBase(
-    text, onClick, modifier, enabled, 72.dp, LargeShape,
-    DrSurfaceRaised, DrTextPrimary, MaterialTheme.typography.labelLarge
-)
+) {
+    DrButtonBase(
+        text, onClick, modifier, enabled, ButtonSize.Large,
+        DrSurfaceRaised, DrTextPrimary, MaterialTheme.typography.labelLarge
+    )
+}
 
-// 일반 버튼: 최소 높이 56dp
+// 일반 버튼
 @Composable
 fun DrButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true
-) = DrButtonBase(
-    text, onClick, modifier, enabled, 56.dp, SmallShape,
-    DrSurfaceRaised, DrTextPrimary, MaterialTheme.typography.labelLarge
-)
+) {
+    DrButtonBase(
+        text, onClick, modifier, enabled, ButtonSize.Medium,
+        DrSurfaceRaised, DrTextPrimary, MaterialTheme.typography.labelLarge
+    )
+}
 
 // 삭제 버튼: 일반 버튼 모양 + 오류색 글자
 @Composable
@@ -132,10 +169,12 @@ fun DrDangerButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true
-) = DrButtonBase(
-    text, onClick, modifier, enabled, 56.dp, SmallShape,
-    DrSurfaceRaised, DrError, MaterialTheme.typography.labelLarge
-)
+) {
+    DrButtonBase(
+        text, onClick, modifier, enabled, ButtonSize.Medium,
+        DrSurfaceRaised, DrError, MaterialTheme.typography.labelLarge
+    )
+}
 
 // 캡처 버튼: 큰 카드 + 셔터 모양 링 + 글자 32sp. 최소 높이 160dp, 모서리 32dp, 테두리선 없음
 @Composable
@@ -175,12 +214,13 @@ fun DrCaptureButton(
     }
 }
 
-// 카드: 모서리 24dp(공식 Radius/l), 안쪽 여백 20dp, 안쪽 항목 간격 12dp, 그림자 없음
+// 카드: 모서리 24dp(공식 Radius/l), 안쪽 여백 차량 24dp / 휴대폰 20dp, 안쪽 항목 간격 12dp, 그림자 없음
 @Composable
 fun DrCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val pad = if (isCar()) 24.dp else 20.dp
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(24.dp),
@@ -188,7 +228,7 @@ fun DrCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
+            modifier = Modifier.padding(pad),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             content = content
         )

@@ -7,7 +7,8 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 
-// 사진 오른쪽 아래에 작은 "사진 서명" 같은 글씨를 입힌다. (아주 연한 반투명 바탕 + 얇은 그림자)
+// 사진 오른쪽 아래에 작은 "차량 정보" 글씨를 입힌다.
+// Pleos 순정 느낌: 흰 글씨 + 공식 어두운 색(#131417) 반투명 바탕 + 아주 옅은 그림자.
 object StickerRender {
 
     // ---- 크기 조절은 여기 숫자만 바꾸면 된다 (dp/sp는 폭 360dp 사진 기준) ----
@@ -16,14 +17,14 @@ object StickerRender {
     private const val PAD_H_DP = 3f           // 바탕 좌우 여백
     private const val PAD_V_DP = 1.5f         // 바탕 위아래 여백
     private const val INSET_DP = 8f           // 사진 가장자리에서 떨어진 거리
-    private const val CORNER_DP = 3f          // 바탕 모서리
-    private const val BACK_ALPHA = 110        // 바탕 진하기 (0 투명 ~ 255 불투명)
+    private const val CORNER_DP = 4f          // 바탕 모서리
+    private const val BACK_ALPHA = 163        // 바탕 진하기 (0 투명 ~ 255 불투명). 163 = 공식 64%
     private const val SHADOW_DP = 1.5f        // 그림자 퍼짐
-    private const val SHADOW_ALPHA = 200      // 그림자 진하기
+    private const val SHADOW_ALPHA = 90       // 그림자 진하기
     // --------------------------------------------------------------------------
 
-    private val INK = Color.rgb(232, 217, 191)                    // 글자: 크림색 #E8D9BF
-    private val BACK = Color.argb(BACK_ALPHA, 20, 18, 16)         // 바탕: 어두운 갈색(반투명)
+    private val INK = Color.rgb(255, 255, 255)                    // 글자: 흰색 (공식 text/light primary)
+    private val BACK = Color.argb(BACK_ALPHA, 19, 20, 23)         // 바탕: #131417 반투명 (공식 basic/00)
 
     // 머리말(시각·모드·속도)과 꼬리(장소). 길면 꼬리만 줄인다.
     private fun parts(m: DriveMoment): List<Pair<String, String>> {
@@ -64,7 +65,8 @@ object StickerRender {
 
         val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = INK
-            typeface = Typeface.create(Typeface.SERIF, Typeface.ITALIC)
+            // 시스템 글꼴(차량에서는 Asta Sans)의 굵은 글씨
+            typeface = Typeface.create(Typeface.DEFAULT, 600, false)
             textSize = TEXT_SP * scale * unit
             setShadowLayer(shadowR, shadowR * 0.3f, shadowR * 0.3f, Color.argb(SHADOW_ALPHA, 0, 0, 0))
         }
