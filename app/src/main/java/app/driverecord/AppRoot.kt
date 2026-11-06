@@ -1,16 +1,24 @@
 package app.driverecord
 
+import android.content.pm.PackageManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -22,21 +30,70 @@ import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.driverecord.ui.theme.DrAmber
 import app.driverecord.ui.theme.DrAmberContainer
 import app.driverecord.ui.theme.DrBackground
 import app.driverecord.ui.theme.DrSurface
 import app.driverecord.ui.theme.DrTextSecondary
 
+// 차량용 큰 메뉴 버튼 (Pleos 큰 버튼 기준으로 높이 크게)
+@Composable
+private fun CarRailButton(
+    selected: Boolean,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit,
+    label: String
+) {
+    val tint = if (selected) DrAmber else DrTextSecondary
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp)
+            .height(128.dp)
+            .clip(RoundedCornerShape(32.dp))
+            .background(if (selected) DrAmberContainer else Color.Transparent)
+            .clickable(role = Role.Tab, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            CompositionLocalProvider(LocalContentColor provides tint) { icon() }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                label,
+                color = tint,
+                fontSize = 24.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+            )
+        }
+    }
+}
+
 @Composable
 fun AppRoot(vehicle: VehicleDataSource) {
     var tab by remember { mutableStateOf(0) }
+
+    val context = LocalContext.current
+    val onCar = remember {
+        context.packageManager.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)
+    }
+    val iconDp: Dp = if (onCar) 48.dp else 28.dp
+    val labelSize: TextUnit = if (onCar) 24.sp else TextUnit.Unspecified
 
     // 선택은 포인트색 아이콘·글자 + 어두운 표시, 비선택은 보조 글자색
     val barColors = NavigationBarItemDefaults.colors(
@@ -56,10 +113,10 @@ fun AppRoot(vehicle: VehicleDataSource) {
 
     // 탭 아이콘: 선택/비선택에 따라 정해진 색(LocalContentColor)을 그대로 씀
     val captureIcon: @Composable () -> Unit = {
-        DrIcon(DrIconKind.Camera, LocalContentColor.current, iconSize = 28.dp)
+        DrIcon(DrIconKind.Camera, LocalContentColor.current, iconSize = iconDp)
     }
     val fixIcon: @Composable () -> Unit = {
-        DrIcon(DrIconKind.Tune, LocalContentColor.current, iconSize = 28.dp)
+        DrIcon(DrIconKind.Tune, LocalContentColor.current, iconSize = iconDp)
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(DrBackground)) {
@@ -74,20 +131,24 @@ fun AppRoot(vehicle: VehicleDataSource) {
                     NavigationBar(
                         containerColor = DrSurface,
                         tonalElevation = 0.dp,
-                        modifier = Modifier.heightIn(min = 80.dp)
+                        modifier = Modifier.heightIn(min = if (onCar) 120.dp else 80.dp)
                     ) {
                         NavigationBarItem(
                             selected = tab == 0,
                             onClick = { tab = 0 },
                             icon = captureIcon,
-                            label = { Text("캡처", style = MaterialTheme.typography.labelMedium) },
+                            label = {
+                                Text("캡처", style = MaterialTheme.typography.labelMedium, fontSize = labelSize)
+                            },
                             colors = barColors
                         )
                         NavigationBarItem(
                             selected = tab == 1,
                             onClick = { tab = 1 },
                             icon = fixIcon,
-                            label = { Text("사진 보정", style = MaterialTheme.typography.labelMedium) },
+                            label = {
+                                Text("사진 보정", style = MaterialTheme.typography.labelMedium, fontSize = labelSize)
+                            },
                             colors = barColors
                         )
                     }
@@ -96,26 +157,38 @@ fun AppRoot(vehicle: VehicleDataSource) {
         ) { inner ->
             Row(Modifier.fillMaxSize().padding(inner)) {
                 if (sideRail) {
-                    NavigationRail(
-                        containerColor = DrSurface,
-                        windowInsets = WindowInsets()
-                    ) {
-                        Spacer(Modifier.weight(1f))
-                        NavigationRailItem(
-                            selected = tab == 0,
-                            onClick = { tab = 0 },
-                            icon = captureIcon,
-                            label = { Text("캡처", style = MaterialTheme.typography.labelMedium) },
-                            colors = railColors
-                        )
-                        NavigationRailItem(
-                            selected = tab == 1,
-                            onClick = { tab = 1 },
-                            icon = fixIcon,
-                            label = { Text("사진 보정", style = MaterialTheme.typography.labelMedium) },
-                            colors = railColors
-                        )
-                        Spacer(Modifier.weight(1f))
+                    if (onCar) {
+                        // 차량: 넓고 큰 버튼 두 개
+                        Column(
+                            Modifier.width(172.dp).fillMaxHeight().background(DrSurface),
+                            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CarRailButton(tab == 0, { tab = 0 }, captureIcon, "캡처")
+                            CarRailButton(tab == 1, { tab = 1 }, fixIcon, "사진 보정")
+                        }
+                    } else {
+                        NavigationRail(
+                            containerColor = DrSurface,
+                            windowInsets = WindowInsets()
+                        ) {
+                            Spacer(Modifier.weight(1f))
+                            NavigationRailItem(
+                                selected = tab == 0,
+                                onClick = { tab = 0 },
+                                icon = captureIcon,
+                                label = { Text("캡처", style = MaterialTheme.typography.labelMedium) },
+                                colors = railColors
+                            )
+                            NavigationRailItem(
+                                selected = tab == 1,
+                                onClick = { tab = 1 },
+                                icon = fixIcon,
+                                label = { Text("사진 보정", style = MaterialTheme.typography.labelMedium) },
+                                colors = railColors
+                            )
+                            Spacer(Modifier.weight(1f))
+                        }
                     }
                 }
 
