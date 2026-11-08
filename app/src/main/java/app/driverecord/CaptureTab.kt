@@ -24,17 +24,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.driverecord.ui.theme.DrAmber
 import app.driverecord.ui.theme.DrError
 import app.driverecord.ui.theme.DrOutline
+import app.driverecord.ui.theme.DrSurfaceHigh
 import app.driverecord.ui.theme.DrTextPrimary
 import app.driverecord.ui.theme.DrTextSecondary
 import kotlinx.coroutines.Dispatchers
@@ -102,6 +106,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
 
         // 이 장면을 넣기 전에, 같은 장소의 예전 장면이 있는지 찾는다
         recallText = PlaceRecall.message(PlaceRecall.find(moments, place), place.name)
+            ?.replace(" 에서", "에서")   // "시흥동 에서" 빈칸 정리
 
         moments.add(
             DriveMoment(
@@ -154,6 +159,48 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
     }
 
     // ---- 가로/세로 화면에서 함께 쓰는 조각들 ----
+
+    // 마지막으로 저장한 장면 카드: 캡처하자마자 뜨고, 다음 캡처 전까지 그대로 남는다 (움직임 없음)
+    val lastCard: @Composable (Dp) -> Unit = { photoHeight ->
+        val last = moments.lastOrNull()
+        if (last != null) {
+            // 사진은 작게 줄여서(inSampleSize) 뒤에서 읽는다. 사진이 아직 없으면 같은 크기의 빈 자리를 먼저 보여 준다.
+            val lastPhoto by produceState<ImageBitmap?>(null, last.photoPath) {
+                value = if (last.photoPath.isEmpty()) null else withContext(Dispatchers.IO) {
+                    val opts = BitmapFactory.Options().apply { inSampleSize = 2 }
+                    BitmapFactory.decodeFile(last.photoPath, opts)?.asImageBitmap()
+                }
+            }
+            val justNow = System.currentTimeMillis() - last.createdAt < 10_000
+            DrCard {
+                Text("마지막으로 저장한 장면", style = MaterialTheme.typography.titleSmall)
+                val photo = lastPhoto
+                if (photo != null) {
+                    Image(
+                        photo, null,
+                        Modifier
+                            .fillMaxWidth()
+                            .height(photoHeight)
+                            .clip(RoundedCornerShape(16.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                } else if (justNow) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(photoHeight)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(DrSurfaceHigh)
+                    )
+                }
+                Text(
+                    "장면 %02d · %s · %s".format(moments.size, last.timeText, last.placeName),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DrTextSecondary
+                )
+            }
+        }
+    }
 
     // 같은 장소 회상 카드
     val recallCard: @Composable () -> Unit = {
@@ -289,6 +336,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         // 가로로 넓은 화면(차량 디스플레이 등)이면 2열로
         val wide = maxWidth > maxHeight && maxWidth >= 480.dp
+        val roomy = maxHeight >= 600.dp   // 높이가 넉넉한가 (안쪽 Column 에서는 maxHeight 를 바로 못 읽어서 여기서 미리 계산)
 
         if (wide && !isParked) {
             // ---- 가로 주행 화면: 왼쪽 큰 캡처 버튼 / 오른쪽 정보와 전환 ----
@@ -303,7 +351,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                 ) {
                     DrCaptureButton("캡처", onClick = { capture() }, modifier = Modifier.fillMaxWidth().weight(1f))
                     Text(
-                        "핸들 버튼으로도 저장",
+                        "화면의 캡처 버튼을 눌러 저장해요",
                         style = MaterialTheme.typography.bodySmall,
                         color = DrTextSecondary
                     )
@@ -314,13 +362,31 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                 ) {
                     Text("주행 중", style = MaterialTheme.typography.headlineSmall)
                     Spacer(Modifier.height(12.dp))
-                    Column(
-                        modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        recallCard()
-                        demoCard()
+                    if (roomy) {
+                        // 높이가 넉넉하면: 위 카드들 아래 남은 빈 자리를 마지막 장면 사진이 채운다
+                        // (시연 설정을 펼치면 남는 자리가 줄어서 사진도 알아서 작아진다)
+                        Column(
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            recallCard()
+                            demoCard()
+                            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
+                                lastCard((maxHeight - 140.dp).coerceIn(100.dp, 420.dp))
+                            }
+                        }
+                    } else {
+                        // 높이가 낮으면(작은 폰 가로): 예전처럼 스크롤, 사진은 고정 크기
+                        Column(
+                            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            recallCard()
+                            demoCard()
+                            lastCard(if (demoOpen) 140.dp else 220.dp)
+                        }
                     }
                     Spacer(Modifier.height(12.dp))
                     modeButton()
@@ -371,12 +437,13 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                         ) {
                             DrCaptureButton("캡처", onClick = { capture() }, modifier = Modifier.fillMaxWidth())
                             Text(
-                                "핸들 버튼으로도 저장",
+                                "화면의 캡처 버튼을 눌러 저장해요",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DrTextSecondary
                             )
                             recallCard()
                             demoCard()
+                            lastCard(if (demoOpen) 140.dp else 220.dp)
                         }
                     } else {
                         Text("오늘의 장면 ${moments.size}개", style = MaterialTheme.typography.titleMedium)
