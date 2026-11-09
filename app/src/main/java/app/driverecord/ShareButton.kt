@@ -3,6 +3,8 @@ package app.driverecord
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,13 +31,26 @@ import androidx.compose.ui.unit.dp
 import app.driverecord.ui.theme.DrError
 import app.driverecord.ui.theme.DrTextSecondary
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 private const val PREFS_NAME = "share_prefs"
 private const val KEY_CONSENT = "share_consent"
+private const val UPLOAD_TIMEOUT_MS = 15_000L   // 이 시간 안에 못 올리면 실패로 안내
+
+// 지금 인터넷에 연결되어 있는가 (확인할 수 없으면 연결된 것으로 보고 올리기를 시도한다)
+private fun isOnline(context: Context): Boolean = try {
+    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+    caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
+} catch (e: Exception) {
+    true
+}
 
 // "폰으로 보내기" 버튼. 처음 누르면 안내·동의 창, 동의하면 사진(스티커 포함)을 올리고 QR 코드 창을 띄운다.
+// QR 창의 "동의 철회"를 누르면 동의가 지워지고, 다음에 누를 때 안내·동의 창이 다시 뜬다.
 @Composable
 fun ShareButton(moment: DriveMoment, modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -44,9 +60,15 @@ fun ShareButton(moment: DriveMoment, modifier: Modifier = Modifier) {
     var qr by remember { mutableStateOf<Bitmap?>(null) }
     var errorText by remember { mutableStateOf<String?>(null) }
     var showConsent by remember { mutableStateOf(false) }
+    var showWithdraw by remember { mutableStateOf(false) }   // 동의 철회 확인 창
 
     // 실제로 사진을 올리고 QR을 만든다 (동의한 뒤에만 호출)
     fun startUpload() {
+        // 인터넷이 없으면 기다리지 않고 바로 안내한다
+        if (!isOnline(context)) {
+            errorText = "인터넷에 연결되어 있지 않아요. 연결을 확인한 뒤 다시 눌러 주세요."
+            return
+        }
         busy = true
         errorText = null
         scope.launch {
@@ -56,7 +78,13 @@ fun ShareButton(moment: DriveMoment, modifier: Modifier = Modifier) {
                         ?: error("사진을 읽을 수 없어요")
                     if (moment.sticker) StickerRender.apply(bmp, moment) else bmp
                 }
-                val id = ShareUploader.upload(photo)
+                // 올리기가 끝나지 않고 계속 기다리는 일이 없도록 시간 제한을 둔다
+                val job = async { ShareUploader.upload(photo) }
+                val id = withTimeoutOrNull(UPLOAD_TIMEOUT_MS) { job.await() }
+                if (id == null) {
+                    job.cancel()
+                    error("시간이 너무 오래 걸려요. 인터넷 연결을 확인한 뒤 다시 눌러 주세요.")
+                }
                 qr = withContext(Dispatchers.Default) {
                     QrMaker.make(ShareLink.url(id))
                 }
@@ -169,6 +197,33 @@ fun ShareButton(moment: DriveMoment, modifier: Modifier = Modifier) {
             },
             confirmButton = {
                 DrButton("닫기", onClick = { qr = null })
+            },
+            dismissButton = {
+                DrButton("동의 철회", onClick = { showWithdraw = true })
+            }
+        )
+    }
+
+    // 동의 철회 확인 창
+    if (showWithdraw) {
+        AlertDialog(
+            onDismissRequest = { showWithdraw = false },
+            title = { Text("보내기 동의를 철회할까요?") },
+            text = {
+                Text(
+                    text = "철회하면 앞으로 사진이 서버에 올라가지 않아요. 다음에 '폰으로 보내기'를 누르면 안내·동의 창이 다시 떠요. 이미 올린 사진은 24시간이 지나면 볼 수 없어요.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    prefs.edit().putBoolean(KEY_CONSENT, false).apply()
+                    showWithdraw = false
+                    qr = null
+                }) { Text("철회", color = DrError) }
+            },
+            dismissButton = {
+                DrButton("취소", onClick = { showWithdraw = false })
             }
         )
     }

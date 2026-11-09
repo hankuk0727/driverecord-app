@@ -1,5 +1,6 @@
 package app.driverecord
 
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioManager
@@ -42,6 +43,7 @@ import app.driverecord.ui.theme.DrSurfaceHigh
 import app.driverecord.ui.theme.DrTextPrimary
 import app.driverecord.ui.theme.DrTextSecondary
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -80,6 +82,30 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
     var demoMode by remember { mutableStateOf(vehicle.isDemoMode()) }
     var demoOpen by remember { mutableStateOf(false) }             // 시연 설정 펼침 (기본 접힘)
     var askReset by remember { mutableStateOf(false) }             // 시연 초기화 확인 창
+
+    // 주행 화면의 "지금 캡처하면 함께 저장돼요" 카드에 보여 줄 실시간 차량 값
+    // (차량에서, 시연 모드가 꺼져 있고, 주행 화면일 때만 읽는다. 속도 1초, 장소·주행 모드 3초.
+    //  시연 모드에서는 정해진 순서가 밀리지 않도록 읽지 않는다.)
+    val onCar = remember { context.packageManager.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE) }
+    var livePlace by remember { mutableStateOf<String?>(null) }
+    var liveSpeed by remember { mutableStateOf<Int?>(null) }
+    var liveMode by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(isParked, demoMode, onCar) {
+        if (isParked || demoMode || !onCar) {
+            livePlace = null; liveSpeed = null; liveMode = null
+            return@LaunchedEffect
+        }
+        var tick = 0
+        while (true) {
+            liveSpeed = vehicle.currentSpeedKmh()          // 속도는 1초마다 (계기판과 차이가 덜 나게)
+            if (tick % 3 == 0) {                           // 장소·주행 모드는 3초마다
+                livePlace = vehicle.currentPlace().name
+                liveMode = vehicle.currentDriveMode()
+            }
+            tick++
+            delay(1000)
+        }
+    }
 
     val multiPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(10)
@@ -212,13 +238,47 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
         }
     }
 
+    // 지금 캡처하면 함께 저장되는 정보 (차량 위치·속도·주행 모드). 글자만 바뀌고 움직이는 효과는 없다.
+    val liveCard: @Composable () -> Unit = {
+        DrCard {
+            Text("지금 캡처하면 함께 저장돼요", style = MaterialTheme.typography.titleSmall)
+            when {
+                demoMode -> Text(
+                    "시연 모드: 장소·속도는 캡처할 때 정해진 순서로 저장돼요.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DrTextSecondary
+                )
+                !onCar -> Text(
+                    "차량에서는 지금 위치·속도·주행 모드가 여기에 보여요.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DrTextSecondary
+                )
+                else -> Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    listOf(
+                        "장소" to (livePlace ?: "확인 중"),
+                        "속도" to (liveSpeed?.let { "$it km/h" } ?: "확인 중"),
+                        "주행 모드" to (liveMode ?: "확인 중")
+                    ).forEachIndexed { i, (label, value) ->
+                        Column(Modifier.weight(if (i == 0) 1.6f else 1f)) {
+                            Text(label, style = MaterialTheme.typography.bodySmall, color = DrTextSecondary)
+                            Text(value, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // 시연 설정: 기본은 접혀 있고, 누르면 펼쳐진다
     val demoCard: @Composable () -> Unit = {
         DrCard {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 56.dp)
+                    .heightIn(min = 72.dp)
                     .clickable { demoOpen = !demoOpen },
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -230,7 +290,10 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                     color = DrTextSecondary
                 )
             }
-            if (demoOpen) {
+            if (demoOpen) Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)   // 항목 사이를 넉넉하게
+            ) {
                 DrButton(
                     "시연 카메라 사진 등록 (현재 ${frameCount}장)",
                     onClick = {
@@ -363,17 +426,21 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                     Text("주행 중", style = MaterialTheme.typography.headlineSmall)
                     Spacer(Modifier.height(12.dp))
                     if (roomy) {
-                        // 높이가 넉넉하면: 위 카드들 아래 남은 빈 자리를 마지막 장면 사진이 채운다
-                        // (시연 설정을 펼치면 남는 자리가 줄어서 사진도 알아서 작아진다)
+                        // 높이가 넉넉하면: 위 카드 아래 남은 빈 자리를 마지막 장면 사진이 채운다
+                        // (시연 설정은 주행 중에는 보이지 않고, 정차 화면 목록 맨 아래에만 있다)
                         Column(
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             recallCard()
-                            demoCard()
                             BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().clipToBounds()) {
-                                lastCard((maxHeight - 140.dp).coerceIn(100.dp, 420.dp))
+                                // 마지막 장면 사진 + 그 아래 "지금 저장될 정보" 카드 (카드 자리 약 170dp를 빼고 사진 크기를 정함)
+                                val photoH = (maxHeight - 320.dp).coerceIn(100.dp, 640.dp)   // Column 안에서는 maxHeight 를 못 읽어서 먼저 계산
+                                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                    lastCard(photoH)
+                                    liveCard()
+                                }
                             }
                         }
                     } else {
@@ -384,8 +451,8 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             recallCard()
-                            demoCard()
-                            lastCard(if (demoOpen) 140.dp else 220.dp)
+                            lastCard(220.dp)
+                            liveCard()
                         }
                     }
                     Spacer(Modifier.height(12.dp))
@@ -442,8 +509,8 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                                 color = DrTextSecondary
                             )
                             recallCard()
-                            demoCard()
-                            lastCard(if (demoOpen) 140.dp else 220.dp)
+                            lastCard(220.dp)
+                            liveCard()
                         }
                     } else {
                         Text("오늘의 장면 ${moments.size}개", style = MaterialTheme.typography.titleMedium)
