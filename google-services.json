@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "305641574987",
+    "project_id": "driverecord-demo",
+    "storage_bucket": "driverecord-demo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:305641574987:android:8a23d2784a795e7586f3ce",
+        "android_client_info": {
+          "package_name": "app.driverecord"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD7RVdlAlUha1_mi1TlMiv5AgbIjLlf7Nk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
