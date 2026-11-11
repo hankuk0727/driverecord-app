@@ -82,6 +82,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
     var demoMode by remember { mutableStateOf(vehicle.isDemoMode()) }
     var demoOpen by remember { mutableStateOf(false) }             // 시연 설정 펼침 (기본 접힘)
     var askReset by remember { mutableStateOf(false) }             // 시연 초기화 확인 창
+    var voiceOn by remember { mutableStateOf(VoiceCapture.isEnabled(context)) }   // 음성 캡처 (기본 꺼짐)
 
     // 주행 화면의 "지금 캡처하면 함께 저장돼요" 카드에 보여 줄 실시간 차량 값
     // (차량에서, 시연 모드가 꺼져 있고, 주행 화면일 때만 읽는다. 속도 1초, 장소·주행 모드 3초.
@@ -185,6 +186,16 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
         onDispose { WheelKeys.onCapture = null }
     }
 
+    // 음성 캡처: 사용자가 켰고 + 차량이고 + 주행 화면일 때만 차량 마이크로 듣는다
+    DisposableEffect(isParked, voiceOn, onCar) {
+        if (!isParked && voiceOn && onCar) VoiceCapture.start(context) { capture() }
+        onDispose { VoiceCapture.stop() }
+    }
+
+    // 주행 화면 캡처 버튼 아래 안내 문구
+    val captureHint = if (voiceOn && onCar) "캡처 버튼을 누르거나 \"캡처\"라고 말하세요"
+    else "화면의 캡처 버튼을 눌러 저장해요"
+
     // ---- 가로/세로 화면에서 함께 쓰는 조각들 ----
 
     // 마지막으로 저장한 장면 카드: 캡처하자마자 뜨고, 다음 캡처 전까지 그대로 남는다 (움직임 없음)
@@ -270,6 +281,27 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                     }
                 }
             }
+        }
+    }
+
+    // 음성 캡처 켜고 끄기 (정차 화면 목록 아래)
+    val voiceCard: @Composable () -> Unit = {
+        DrCard {
+            Text("음성으로 캡처", style = MaterialTheme.typography.titleSmall)
+            DrSwitchRow(
+                label = "\"캡처\"라고 말하면 저장",
+                checked = voiceOn,
+                onCheckedChange = { on ->
+                    voiceOn = on
+                    VoiceCapture.setEnabled(context, on)
+                }
+            )
+            Text(
+                if (onCar) "주행 중에만 차량 마이크로 들어요. 말소리는 차 안에서 글자로만 바뀌고, 저장하거나 서버로 보내지 않아요."
+                else "차량에서만 동작해요.",
+                style = MaterialTheme.typography.bodySmall,
+                color = DrTextSecondary
+            )
         }
     }
 
@@ -390,7 +422,10 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                     }
                 )
             }
-            // 목록 맨 아래: 시연 설정 (접힌 상태로 시작)
+            // 목록 맨 아래: 음성 캡처 설정, 시연 설정 (접힌 상태로 시작)
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                voiceCard()
+            }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 demoCard()
             }
@@ -415,7 +450,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                 ) {
                     DrCaptureButton("캡처", onClick = { capture() }, modifier = Modifier.fillMaxWidth().weight(1f))
                     Text(
-                        "화면의 캡처 버튼을 눌러 저장해요",
+                        captureHint,
                         style = MaterialTheme.typography.bodySmall,
                         color = DrTextSecondary
                     )
@@ -505,7 +540,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
                         ) {
                             DrCaptureButton("캡처", onClick = { capture() }, modifier = Modifier.fillMaxWidth())
                             Text(
-                                "화면의 캡처 버튼을 눌러 저장해요",
+                                captureHint,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DrTextSecondary
                             )
