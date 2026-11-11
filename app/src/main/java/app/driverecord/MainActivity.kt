@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         pleosVehicle.start()
         drivingMonitor.start()
+        VoiceGuide.start(this)   // 캡처 음성 안내 준비 (차량에서만)
         // 권한 묻기는 아래 setContent 안에서, 정차 중일 때만 한다.
     }
 
@@ -29,6 +30,7 @@ class MainActivity : ComponentActivity() {
         super.onStop()
         pleosVehicle.pause()
         drivingMonitor.stop()
+        VoiceGuide.stop()
     }
 
     override fun onDestroy() {

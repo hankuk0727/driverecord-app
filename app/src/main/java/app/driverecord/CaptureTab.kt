@@ -148,6 +148,7 @@ fun CaptureTab(vehicle: VehicleDataSource, modifier: Modifier = Modifier) {
         )
         store.save(moments)
         tone?.startTone(ToneGenerator.TONE_PROP_BEEP, 150)
+        VoiceGuide.say("장면을 저장했어요")   // 화면을 안 봐도 저장된 걸 알 수 있게 (차량에서만)
 
         // 사진 가져오기 + 보정 + 학습 + 저장은 뒤에서 처리 (캡처 반응은 바로 돌려줌)
         scope.launch(Dispatchers.Default) {

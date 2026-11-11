@@ -60,6 +60,7 @@ dependencies {
     // Pleos 차량 SDK: Vehicle State, NaviHelper(길 안내 요청)
     implementation("ai.pleos.playground:Vehicle:2.3.2")
     implementation("ai.pleos.playground:NaviHelper:3.0.5")
+    implementation("ai.pleos.playground:TextToSpeech:3.3.1")
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
